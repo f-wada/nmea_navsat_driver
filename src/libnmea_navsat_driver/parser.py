@@ -238,6 +238,8 @@ parse_maps = {
         ("hdop", safe_float, 8),
         ("num_satellites", safe_int, 7),
         ("utc_time", convert_time, 1),
+        #("age", float, 13),
+        #("reference_id", str, 14),
     ],
     "RMC": [
         ("fix_valid", convert_status_flag, 2),

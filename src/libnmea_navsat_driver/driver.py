@@ -40,6 +40,8 @@ from sensor_msgs.msg import NavSatFix, NavSatStatus, TimeReference
 from geometry_msgs.msg import TwistStamped, QuaternionStamped
 from tf.transformations import quaternion_from_euler
 
+from nmea_msgs.msg import Gpgga, Gprmc
+
 from libnmea_navsat_driver.checksum_utils import check_nmea_checksum
 import libnmea_navsat_driver.parser
 
@@ -55,6 +57,9 @@ class RosNMEADriver(object):
             - TwistStamped publisher on the 'vel' channel.
             - QuaternionStamped publisher on the 'heading' channel.
             - TimeReference publisher on the 'time_reference' channel.
+            
+            - nmea_Gpgga publisher on the 'gga' channel.
+            - nmea_Gprmc publisher on the 'rmc' channel. 
 
         :ROS Parameters:
             - ~time_ref_source (str)
@@ -82,6 +87,9 @@ class RosNMEADriver(object):
         if not self.use_GNSS_time:
             self.time_ref_pub = rospy.Publisher(
                 'time_reference', TimeReference, queue_size=1)
+            
+        self.gga_pub = rospy.Publisher('gga', Gpgga, queue_size=1)
+        self.rmc_pub = rospy.Publisher('rmc', Gprmc, queue_size=1)
 
         self.time_ref_source = rospy.get_param('~time_ref_source', None)
         self.use_RMC = rospy.get_param('~useRMC', False)
@@ -180,6 +188,9 @@ class RosNMEADriver(object):
         current_fix = NavSatFix()
         current_fix.header.stamp = current_time
         current_fix.header.frame_id = frame_id
+        current_gga = Gpgga()
+        current_gga.header.stamp = current_time
+        current_gga.header.frame_id = frame_id
         if not self.use_GNSS_time:
             current_time_ref = TimeReference()
             current_time_ref.header.stamp = current_time
@@ -241,8 +252,25 @@ class RosNMEADriver(object):
             current_fix.position_covariance[4] = (hdop * self.lat_std_dev) ** 2
             current_fix.position_covariance[8] = (
                 2 * hdop * self.alt_std_dev) ** 2  # FIXME
+            
+            #create gga topic
+            #current_gga.utc_seconds = data['utc_time']
+            current_gga.lat = data['latitude']
+            current_gga.lat_dir = data['latitude_direction']
+            current_gga.lon = data['longitude']
+            current_gga.lon_dir = data['longitude_direction']
+            current_gga.gps_qual = data['fix_type']
+            current_gga.num_sats = data['num_satellites']
+            current_gga.hdop = data['hdop']
+            current_gga.alt = data['altitude']
+            current_gga.altitude_units = "M"
+            current_gga.undulation = data['mean_sea_level']
+            current_gga.undulation_units = "M"
+            #current_gga.diff_age = data['age']
+            #current_gga.station_id = data['reference_id']
 
             self.fix_pub.publish(current_fix)
+            self.gga_pub.publish(current_gga)
 
             if not (math.isnan(data['utc_time'][0]) or self.use_GNSS_time):
                 current_time_ref.time_ref = rospy.Time(
